@@ -1,157 +1,218 @@
-index.html
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Evaluador RoB 2 – Auditor Cochrane</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  <title>ROB 2 Assistant – Universidad Nacional de Colombia</title>
   <style>
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f6f9;
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      justify-content: center;
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      max-width: 900px;
     }
-
-    .container {
+    textarea {
       width: 100%;
-      max-width: 800px;
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      display: flex;
-      flex-direction: column;
-      height: 90vh;
     }
-
-    header {
-      background: #dc3545;
-      color: white;
-      padding: 15px;
-      text-align: center;
+    select, button {
+      margin-top: 10px;
     }
-
-    #chat-history {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-      border-bottom: 1px solid #ddd;
-    }
-
-    .message {
-      margin-bottom: 15px;
-      max-width: 80%;
-      padding: 10px 15px;
-      border-radius: 15px;
-      line-height: 1.5;
-    }
-
-    .ai-message {
-      background: #f0f2f5;
-      color: #333;
-      align-self: flex-start;
-    }
-
-    .user-message {
-      background: #dc3545;
-      color: white;
-      align-self: flex-end;
-      margin-left: auto;
-    }
-
-    #controls {
-      padding: 15px;
-      display: flex;
-      gap: 10px;
-    }
-
-    input[type="text"] {
-      flex: 1;
-      padding: 10px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-
-    button {
-      background: #dc3545;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #c82333;
+    hr {
+      margin: 40px 0;
     }
   </style>
 </head>
-
 <body>
 
-<div class="container">
-  <header>
-    <h2>Evaluador de Riesgo de Sesgo (RoB 2)</h2>
-  </header>
+<h1>ROB 2 Assistant</h1>
+<p>
+Este asistente guía la evaluación del riesgo de sesgo (RoB 2).
+<strong>No evalúa por el estudiante</strong>.  
+Utiliza IA externa únicamente para <strong>analizar la coherencia metodológica</strong>
+entre el juicio y la evidencia proporcionada.
+</p>
 
-  <div id="chat-history"></div>
-
-  <div id="controls">
-    <input type="text" id="user-input" placeholder="Escribe aquí…">
-    <button id="send-btn">Enviar</button>
-  </div>
-</div>
+<hr>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+/* ==========================
+   PROMPT DOCENTE CENTRAL
+   ========================== */
+const SYSTEM_PROMPT = `
+Eres un auditor experto en Metodología Cochrane (RoB 2).
 
-  const chatHistory = document.getElementById("chat-history");
-  const userInput = document.getElementById("user-input");
-  const sendBtn = document.getElementById("send-btn");
+NO has leído el artículo completo.
+NO debes evaluar por el estudiante.
+NO debes inferir información no explícita.
 
-  let step = 0;
+Tu tarea es evaluar la COHERENCIA entre:
+1) El juicio metodológico declarado por el estudiante
+2) El fragmento textual del artículo que él proporciona
 
-  const flow = [
-    "Hola, soy tu Auditor Cochrane (RoB 2). No he leído el artículo, tú serás mis ojos críticos.\n\nPara empezar: dime el TÍTULO del artículo.",
-    "Gracias. Ahora indícame la pregunta PICO (Paciente, Intervención, Comparador, Outcome).",
-    "Pasemos al DOMINIO 1: Proceso de aleatorización.\n¿Cuál es tu juicio inicial? (Bajo / Algunas preocupaciones / Alto)",
-    "Copia y pega el fragmento del artículo que respalda ese juicio.",
-    "Excelente. Continúa con el DOMINIO 2 siguiendo el mismo razonamiento.\n\n(En clase veremos el análisis completo)."
-  ];
+Reglas obligatorias:
+- Si el método no está claramente descrito → "Algunas preocupaciones"
+- Si el juicio contradice la evidencia → indícalo explícitamente
+- Si la evidencia es insuficiente → exigir mayor información
+- Nunca completes información faltante
 
-  function addMessage(role, text) {
-    const div = document.createElement("div");
-    div.className = "message " + (role === "user" ? "user-message" : "ai-message");
-    div.textContent = text;
-    chatHistory.appendChild(div);
-    chatHistory.scrollTop = chatHistory.scrollHeight;
+Devuelve SIEMPRE:
+1) Veredicto metodológico (Coherente / Inconsistente / Evidencia insuficiente)
+2) Justificación basada en RoB 2
+3) Una pregunta socrática de seguimiento
+`;
+
+function buildPrompt(domain, judgment, evidence) {
+  return `
+${SYSTEM_PROMPT}
+
+DOMINIO EVALUADO:
+${domain}
+
+JUICIO DEL ESTUDIANTE:
+${judgment}
+
+EVIDENCIA PROPORCIONADA:
+${evidence}
+`;
+}
+
+function analyze(domainId, domainName) {
+  const judgment = document.getElementById(domainId + "-judgment").value;
+  const evidence = document.getElementById(domainId + "-evidence").value;
+
+  if (!judgment || !evidence) {
+    alert("Debe completar el juicio y la evidencia textual.");
+    return;
   }
 
-  addMessage("ai", flow[0]);
-
-  sendBtn.addEventListener("click", sendMessage);
-  userInput.addEventListener("keydown", e => {
-    if (e.key === "Enter") sendMessage();
-  });
-
-  function sendMessage() {
-    const text = userInput.value.trim();
-    if (!text) return;
-
-    addMessage("user", text);
-    userInput.value = "";
-
-    step++;
-    if (step < flow.length) {
-      addMessage("ai", flow[step]);
-    }
-  }
-
-});
+  const prompt = buildPrompt(domainName, judgment, evidence);
+  const url = "https://chat.openai.com/?prompt=" + encodeURIComponent(prompt);
+  window.open(url, "_blank");
+}
 </script>
+
+<!-- ==========================
+     DOMINIO 1
+     ========================== -->
+<h2>Dominio 1: Proceso de aleatorización</h2>
+
+<select id="d1-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d1-evidence" rows="5"
+placeholder="Pegue aquí el fragmento exacto del artículo que justifica su juicio"></textarea>
+
+<br>
+<button onclick="analyze('d1','Dominio 1: Proceso de aleatorización')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
+
+<!-- ==========================
+     DOMINIO 2
+     ========================== -->
+<h2>Dominio 2: Desviaciones de la intervención prevista</h2>
+
+<select id="d2-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d2-evidence" rows="5"
+placeholder="Evidencia textual sobre adherencia, cegamiento, análisis por intención de tratar, etc."></textarea>
+
+<br>
+<button onclick="analyze('d2','Dominio 2: Desviaciones de la intervención prevista')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
+
+<!-- ==========================
+     DOMINIO 3
+     ========================== -->
+<h2>Dominio 3: Datos de resultado faltantes</h2>
+
+<select id="d3-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d3-evidence" rows="5"
+placeholder="Fragmento sobre pérdidas de seguimiento, exclusiones, manejo de datos faltantes"></textarea>
+
+<br>
+<button onclick="analyze('d3','Dominio 3: Datos de resultado faltantes')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
+
+<!-- ==========================
+     DOMINIO 4
+     ========================== -->
+<h2>Dominio 4: Medición del desenlace</h2>
+
+<select id="d4-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d4-evidence" rows="5"
+placeholder="Texto sobre cegamiento de evaluadores, validez de instrumentos, estandarización"></textarea>
+
+<br>
+<button onclick="analyze('d4','Dominio 4: Medición del desenlace')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
+
+<!-- ==========================
+     DOMINIO 5
+     ========================== -->
+<h2>Dominio 5: Selección del resultado informado</h2>
+
+<select id="d5-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d5-evidence" rows="5"
+placeholder="Evidencia sobre protocolo, outcomes preespecificados, análisis selectivo"></textarea>
+
+<br>
+<button onclick="analyze('d5','Dominio 5: Selección del resultado informado')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
+
+<p><em>
+Universidad Nacional de Colombia – Evaluación metodológica con apoyo de IA  
+Este asistente no reemplaza el juicio crítico del estudiante.
+</em></p>
 
 </body>
 </html>
