@@ -1,198 +1,76 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Evaluación con IA – RoB 2</title>
-
-<style>
-body {
-  font-family: Arial, sans-serif;
-  margin: 20px;
-  max-width: 900px;
-}
-
-h1, h2, h3 {
-  color: #2c3e50;
-}
-
-.domain {
-  border: 1px solid #ccc;
-  padding: 15px;
-  margin-bottom: 20px;
-  border-radius: 6px;
-  background-color: #f9f9f9;
-}
-
-label {
-  font-weight: bold;
-}
-
-select, textarea, button {
-  width: 100%;
-  margin-top: 6px;
-  margin-bottom: 12px;
-  padding: 8px;
-  font-size: 14px;
-}
-
-button {
-  background-color: #2980b9;
-  color: white;
-  border: none;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-button:hover {
-  background-color: #1f6391;
-}
-
-textarea[readonly] {
-  background-color: #eee;
-}
-</style>
+  <meta charset="UTF-8">
+  <title>ROB 2 Assistant – Universidad Nacional de Colombia</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 40px;
+      max-width: 900px;
+    }
+    textarea {
+      width: 100%;
+    }
+    select, button {
+      margin-top: 10px;
+    }
+    hr {
+      margin: 40px 0;
+    }
+  </style>
 </head>
-
 <body>
 
-<h1>Evaluación del riesgo de sesgo (RoB 2) con apoyo de IA</h1>
-
+<h1>ROB 2 Assistant</h1>
 <p>
-Complete el juicio y la evidencia textual para cada dominio.
-El sistema generará un <strong>prompt transparente</strong> que podrá copiar y pegar en ChatGPT.
+Este asistente guía la evaluación del riesgo de sesgo (RoB 2).
+<strong>No evalúa por el estudiante</strong>.  
+Utiliza IA externa únicamente para <strong>analizar la coherencia metodológica</strong>
+entre el juicio y la evidencia proporcionada.
 </p>
 
-<!-- ===================== DOMINIOS ===================== -->
-
-<div class="domain">
-<h2>Dominio 1: Proceso de aleatorización</h2>
-
-<label>Juicio</label>
-<select id="d1-judgment">
-  <option value="">Seleccione</option>
-  <option>Bajo riesgo</option>
-  <option>Algunas preocupaciones</option>
-  <option>Alto riesgo</option>
-</select>
-
-<label>Evidencia textual (copiada del artículo)</label>
-<textarea id="d1-evidence" rows="4"></textarea>
-
-<button onclick="analyze('d1', 'Proceso de aleatorización')">
-Analizar con IA
-</button>
-</div>
-
-<div class="domain">
-<h2>Dominio 2: Desviaciones de las intervenciones</h2>
-
-<label>Juicio</label>
-<select id="d2-judgment">
-  <option value="">Seleccione</option>
-  <option>Bajo riesgo</option>
-  <option>Algunas preocupaciones</option>
-  <option>Alto riesgo</option>
-</select>
-
-<label>Evidencia textual</label>
-<textarea id="d2-evidence" rows="4"></textarea>
-
-<button onclick="analyze('d2', 'Desviaciones de las intervenciones')">
-Analizar con IA
-</button>
-</div>
-
-<div class="domain">
-<h2>Dominio 3: Datos de resultado faltantes</h2>
-
-<label>Juicio</label>
-<select id="d3-judgment">
-  <option value="">Seleccione</option>
-  <option>Bajo riesgo</option>
-  <option>Algunas preocupaciones</option>
-  <option>Alto riesgo</option>
-</select>
-
-<label>Evidencia textual</label>
-<textarea id="d3-evidence" rows="4"></textarea>
-
-<button onclick="analyze('d3', 'Datos de resultado faltantes')">
-Analizar con IA
-</button>
-</div>
-
-<div class="domain">
-<h2>Dominio 4: Medición del resultado</h2>
-
-<label>Juicio</label>
-<select id="d4-judgment">
-  <option value="">Seleccione</option>
-  <option>Bajo riesgo</option>
-  <option>Algunas preocupaciones</option>
-  <option>Alto riesgo</option>
-</select>
-
-<label>Evidencia textual</label>
-<textarea id="d4-evidence" rows="4"></textarea>
-
-<button onclick="analyze('d4', 'Medición del resultado')">
-Analizar con IA
-</button>
-</div>
-
-<div class="domain">
-<h2>Dominio 5: Selección del resultado informado</h2>
-
-<label>Juicio</label>
-<select id="d5-judgment">
-  <option value="">Seleccione</option>
-  <option>Bajo riesgo</option>
-  <option>Algunas preocupaciones</option>
-  <option>Alto riesgo</option>
-</select>
-
-<label>Evidencia textual</label>
-<textarea id="d5-evidence" rows="4"></textarea>
-
-<button onclick="analyze('d5', 'Selección del resultado informado')">
-Analizar con IA
-</button>
-</div>
-
-<!-- ===================== PROMPT ===================== -->
-
-<h3>Prompt generado</h3>
-
-<textarea id="generated-prompt" rows="12" readonly></textarea>
-
-<button onclick="copyPrompt()">Copiar prompt</button>
-
-<!-- ===================== SCRIPT ===================== -->
+<hr>
 
 <script>
+/* ==========================
+   PROMPT DOCENTE CENTRAL
+   ========================== */
+const SYSTEM_PROMPT = `
+Eres un auditor experto en Metodología Cochrane (RoB 2).
+
+NO has leído el artículo completo.
+NO debes evaluar por el estudiante.
+NO debes inferir información no explícita.
+
+Tu tarea es evaluar la COHERENCIA entre:
+1) El juicio metodológico declarado por el estudiante
+2) El fragmento textual del artículo que él proporciona
+
+Reglas obligatorias:
+- Si el método no está claramente descrito → "Algunas preocupaciones"
+- Si el juicio contradice la evidencia → indícalo explícitamente
+- Si la evidencia es insuficiente → exigir mayor información
+- Nunca completes información faltante
+
+Devuelve SIEMPRE:
+1) Veredicto metodológico (Coherente / Inconsistente / Evidencia insuficiente)
+2) Justificación basada en RoB 2
+3) Una pregunta socrática de seguimiento
+`;
+
 function buildPrompt(domain, judgment, evidence) {
   return `
-Actúe como un evaluador metodológico experto en ensayos clínicos.
+${SYSTEM_PROMPT}
 
-Estoy aplicando la herramienta RoB 2 de Cochrane.
-
-Dominio evaluado:
+DOMINIO EVALUADO:
 ${domain}
 
-Juicio asignado por el evaluador:
+JUICIO DEL ESTUDIANTE:
 ${judgment}
 
-Evidencia textual del artículo:
-"${evidence}"
-
-Tareas:
-1. Evalúe si el juicio es coherente con la evidencia.
-2. Indique si el juicio es apropiado según RoB 2.
-3. Señale cualquier información faltante relevante.
-4. No infiera información que no esté explícitamente en el texto.
-5. Use un lenguaje claro y estructurado.
-
-Responda en español.
+EVIDENCIA PROPORCIONADA:
+${evidence}
 `;
 }
 
@@ -200,42 +78,141 @@ function analyze(domainId, domainName) {
   const judgment = document.getElementById(domainId + "-judgment").value;
   const evidence = document.getElementById(domainId + "-evidence").value;
 
-  if (!judgment || !evidence.trim()) {
+  if (!judgment || !evidence) {
     alert("Debe completar el juicio y la evidencia textual.");
     return;
   }
 
   const prompt = buildPrompt(domainName, judgment, evidence);
-
-  document.getElementById("generated-prompt").value = prompt;
-
-  alert(
-    "El prompt ha sido generado.\n\n" +
-    "Cópielo y luego se abrirá ChatGPT para pegarlo."
-  );
-
-  window.open("https://chatgpt.com/", "_blank");
-}
-
-function copyPrompt() {
-  const text = document.getElementById("generated-prompt").value;
-
-  if (!text.trim()) {
-    alert("No hay ningún prompt para copiar.");
-    return;
-  }
-
-  navigator.clipboard.writeText(text).then(() => {
-    alert("Prompt copiado al portapapeles.\nPéguelo en ChatGPT.");
-  });
+  const url = "https://chat.openai.com/?prompt=" + encodeURIComponent(prompt);
+  window.open(url, "_blank");
 }
 </script>
+
+<!-- ==========================
+     DOMINIO 1
+     ========================== -->
+<h2>Dominio 1: Proceso de aleatorización</h2>
+
+<select id="d1-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d1-evidence" rows="5"
+placeholder="Pegue aquí el fragmento exacto del artículo que justifica su juicio"></textarea>
+
+<br>
+<button onclick="analyze('d1','Dominio 1: Proceso de aleatorización')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
+
+<!-- ==========================
+     DOMINIO 2
+     ========================== -->
+<h2>Dominio 2: Desviaciones de la intervención prevista</h2>
+
+<select id="d2-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d2-evidence" rows="5"
+placeholder="Evidencia textual sobre adherencia, cegamiento, análisis por intención de tratar, etc."></textarea>
+
+<br>
+<button onclick="analyze('d2','Dominio 2: Desviaciones de la intervención prevista')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
+
+<!-- ==========================
+     DOMINIO 3
+     ========================== -->
+<h2>Dominio 3: Datos de resultado faltantes</h2>
+
+<select id="d3-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d3-evidence" rows="5"
+placeholder="Fragmento sobre pérdidas de seguimiento, exclusiones, manejo de datos faltantes"></textarea>
+
+<br>
+<button onclick="analyze('d3','Dominio 3: Datos de resultado faltantes')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
+
+<!-- ==========================
+     DOMINIO 4
+     ========================== -->
+<h2>Dominio 4: Medición del desenlace</h2>
+
+<select id="d4-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d4-evidence" rows="5"
+placeholder="Texto sobre cegamiento de evaluadores, validez de instrumentos, estandarización"></textarea>
+
+<br>
+<button onclick="analyze('d4','Dominio 4: Medición del desenlace')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
+
+<!-- ==========================
+     DOMINIO 5
+     ========================== -->
+<h2>Dominio 5: Selección del resultado informado</h2>
+
+<select id="d5-judgment">
+  <option value="">Seleccione juicio</option>
+  <option>Bajo riesgo</option>
+  <option>Algunas preocupaciones</option>
+  <option>Alto riesgo</option>
+</select>
+
+<br><br>
+
+<textarea id="d5-evidence" rows="5"
+placeholder="Evidencia sobre protocolo, outcomes preespecificados, análisis selectivo"></textarea>
+
+<br>
+<button onclick="analyze('d5','Dominio 5: Selección del resultado informado')">
+Analizar con IA (ChatGPT)
+</button>
+
+<hr>
 
 <p><em>
 Universidad Nacional de Colombia – Evaluación metodológica con apoyo de IA  
 Este asistente no reemplaza el juicio crítico del estudiante.
 </em></p>
 
-  
 </body>
 </html>
