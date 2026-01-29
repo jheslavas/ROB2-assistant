@@ -85,8 +85,14 @@ function analyze(domainId, domainName) {
   }
 
   const prompt = buildPrompt(domainName, judgment, evidence);
-  const url = "https://chat.openai.com/?prompt=" + encodeURIComponent(prompt);
-  window.open(url, "_blank");
+
+  // Copiar al portapapeles
+  navigator.clipboard.writeText(prompt).then(() => {
+    alert("El prompt fue copiado al portapapeles.\n\nSe abrirá ChatGPT. Pegue el contenido y envíelo.");
+    window.open("https://chatgpt.com/", "_blank");
+  }).catch(() => {
+    alert("No se pudo copiar el prompt. Copie manualmente el texto.");
+  });
 }
 </script>
 
